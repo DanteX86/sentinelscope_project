@@ -136,3 +136,104 @@ rule RansomwarePatterns
     condition:
         ($ransom1 or ($encrypt1 and $decrypt1)) and ($bitcoin1 or $payment1) and (any of ($file_ext*) or $readme)
 }
+
+rule SuspiciousPEHeaders
+{
+    meta:
+        description = "Detects PE files with suspicious characteristics"
+        author = "SentinelScope"
+        severity = "medium"
+        
+    strings:
+        $mz = { 4D 5A }
+        $pe = { 50 45 00 00 }
+        $upx1 = "UPX0" nocase
+        $upx2 = "UPX1" nocase
+        $packed = { 60 E8 00 00 00 00 }
+        
+    condition:
+        $mz at 0 and $pe and (any of ($upx*) or $packed)
+}
+
+rule WebShellPatterns
+{
+    meta:
+        description = "Detects web shell patterns"
+        author = "SentinelScope"
+        severity = "high"
+        
+    strings:
+        $php1 = "<?php" nocase
+        $eval1 = "eval(" nocase
+        $exec1 = "exec(" nocase
+        $system1 = "system(" nocase
+        $shell1 = "shell_exec(" nocase
+        $post = "$_POST" nocase
+        $get = "$_GET" nocase
+        $request = "$_REQUEST" nocase
+        
+    condition:
+        $php1 and any of ($eval*, $exec*, $system*, $shell*) and any of ($post, $get, $request)
+}
+
+rule KeyloggerPatterns
+{
+    meta:
+        description = "Detects keylogger-like behavior"
+        author = "SentinelScope"
+        severity = "high"
+        
+    strings:
+        $hook1 = "SetWindowsHookEx" nocase
+        $hook2 = "GetAsyncKeyState" nocase
+        $hook3 = "GetKeyState" nocase
+        $log1 = "keylog" nocase
+        $log2 = "keystroke" nocase
+        $capture = "capture" nocase
+        $record = "record" nocase
+        
+    condition:
+        any of ($hook*) and (any of ($log*) or $capture or $record)
+}
+
+rule SuspiciousNetworkTools
+{
+    meta:
+        description = "Detects suspicious network tools and backdoors"
+        author = "SentinelScope"
+        severity = "high"
+        
+    strings:
+        $netcat = "netcat" nocase
+        $ncat = "ncat" nocase
+        $reverse = "reverse" nocase
+        $shell = "shell" nocase
+        $bind = "bind" nocase
+        $listen = "listen" nocase
+        $connect = "connect" nocase
+        $backdoor = "backdoor" nocase
+        
+    condition:
+        ($netcat or $ncat or $backdoor) and any of ($reverse, $shell, $bind, $listen, $connect)
+}
+
+rule AntiVMDetection
+{
+    meta:
+        description = "Detects anti-VM and sandbox evasion techniques"
+        author = "SentinelScope"
+        severity = "medium"
+        
+    strings:
+        $vm1 = "VirtualBox" nocase
+        $vm2 = "VMware" nocase
+        $vm3 = "VBox" nocase
+        $vm4 = "QEMU" nocase
+        $sandbox1 = "sandbox" nocase
+        $sandbox2 = "analysis" nocase
+        $evasion = "evasion" nocase
+        $detect = "detect" nocase
+        
+    condition:
+        2 of ($vm*) and (any of ($sandbox*) or $evasion or $detect)
+}

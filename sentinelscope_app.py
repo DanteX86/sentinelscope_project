@@ -10,6 +10,9 @@ import os
 import sys
 import threading
 import time
+import json
+import datetime
+import mimetypes
 
 class SentinelScopeApp:
     def __init__(self, root):
@@ -24,6 +27,17 @@ class SentinelScopeApp:
         # Scanning state
         self.scanning = False
         self.scan_cancelled = False
+        self.scan_results = []
+        
+        # File type filters
+        self.file_filters = {
+            'executables': ['.exe', '.dll', '.so', '.dylib', '.app'],
+            'scripts': ['.py', '.js', '.php', '.sh', '.bat', '.cmd', '.ps1'],
+            'documents': ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'],
+            'archives': ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2'],
+            'images': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'],
+            'all': []
+        }
         
         self.setup_ui()
     
@@ -115,6 +129,7 @@ class SentinelScopeApp:
         self.recursive_var = tk.BooleanVar(value=True)
         self.show_clean_var = tk.BooleanVar(value=False)
         self.max_size_var = tk.StringVar(value="100")
+        self.file_filter_var = tk.StringVar(value="all")
         
         opts_frame = tk.Frame(options_frame)
         opts_frame.pack(fill=tk.X, pady=(5, 0))
@@ -127,6 +142,16 @@ class SentinelScopeApp:
         tk.Label(size_frame, text="Max file size (MB):").pack(side=tk.LEFT)
         tk.Entry(size_frame, textvariable=self.max_size_var, width=8).pack(side=tk.LEFT, padx=(5, 0))
         
+        # File type filter
+        filter_frame = tk.Frame(options_frame)
+        filter_frame.pack(fill=tk.X, pady=(5, 0))
+        
+        tk.Label(filter_frame, text="File types:").pack(side=tk.LEFT)
+        filter_combo = ttk.Combobox(filter_frame, textvariable=self.file_filter_var, 
+                                   values=list(self.file_filters.keys()), 
+                                   state="readonly", width=12)
+        filter_combo.pack(side=tk.LEFT, padx=(5, 0))
+        
         # Control buttons
         control_frame = tk.Frame(main_frame)
         control_frame.pack(fill=tk.X, pady=(0, 10))
@@ -138,6 +163,11 @@ class SentinelScopeApp:
         self.cancel_button = tk.Button(control_frame, text="Cancel Scan", command=self.cancel_scan,
                                       bg="#f44336", fg="white", font=("Arial", 12), state="disabled")
         self.cancel_button.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Export button
+        self.export_button = tk.Button(control_frame, text="Export Results", command=self.export_results,
+                                     bg="#2196F3", fg="white", font=("Arial", 12))
+        self.export_button.pack(side=tk.LEFT, padx=(10, 0))
         
         # Progress bar
         self.progress_var = tk.StringVar(value="Ready to scan")
@@ -293,6 +323,16 @@ class SentinelScopeApp:
             self.cancel_button.config(state="disabled")
             self.progress_bar.stop()
     
+    def should_scan_file(self, file_path):
+        """Check if file should be scanned based on file type filter"""
+        filter_type = self.file_filter_var.get()
+        
+        if filter_type == 'all':
+            return True
+            
+        file_ext = os.path.splitext(file_path.lower())[1]
+        return file_ext in self.file_filters.get(filter_type, [])
+    
     def get_files_to_scan(self, target_path, max_size_bytes):
         """Get list of files to scan from target path"""
         files_to_scan = []
@@ -300,7 +340,7 @@ class SentinelScopeApp:
         
         try:
             if os.path.isfile(target_path):
-                if os.path.getsize(target_path) <= max_size_bytes:
+                if os.path.getsize(target_path) <= max_size_bytes and self.should_scan_file(target_path):
                     files_to_scan.append(target_path)
             elif os.path.isdir(target_path):
                 if recursive:
@@ -310,7 +350,8 @@ class SentinelScopeApp:
                                 break
                             file_path = os.path.join(root, file)
                             try:
-                                if os.path.getsize(file_path) <= max_size_bytes:
+                                if (os.path.getsize(file_path) <= max_size_bytes and 
+                                    self.should_scan_file(file_path)):
                                     files_to_scan.append(file_path)
                             except (OSError, IOError):
                                 # Skip files we can't access
@@ -322,7 +363,8 @@ class SentinelScopeApp:
                             file_path = os.path.join(target_path, file)
                             if os.path.isfile(file_path):
                                 try:
-                                    if os.path.getsize(file_path) <= max_size_bytes:
+                                    if (os.path.getsize(file_path) <= max_size_bytes and 
+                                        self.should_scan_file(file_path)):
                                         files_to_scan.append(file_path)
                                 except (OSError, IOError):
                                     continue
@@ -332,6 +374,47 @@ class SentinelScopeApp:
             self.results_text.insert(tk.END, f"Error accessing {target_path}: {str(e)}\n")
         
         return files_to_scan
+    
+    def export_results(self):
+        """Export scan results to JSON file"""
+        if not hasattr(self, 'results_text') or not self.results_text.get(1.0, tk.END).strip():
+            messagebox.showwarning("Warning", "No scan results to export!")
+            return
+        
+        try:
+            # Get results text
+            results_content = self.results_text.get(1.0, tk.END)
+            
+            # Create export data
+            export_data = {
+                'timestamp': datetime.datetime.now().isoformat(),
+                'scan_target': self.target_path_var.get(),
+                'scan_type': self.scan_type.get(),
+                'file_filter': self.file_filter_var.get(),
+                'recursive_scan': self.recursive_var.get(),
+                'max_file_size_mb': self.max_size_var.get(),
+                'raw_results': results_content
+            }
+            
+            # Ask user for save location
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            default_filename = f"sentinelscope_results_{timestamp}.json"
+            
+            filename = filedialog.asksaveasfilename(
+                title="Export Scan Results",
+                defaultextension=".json",
+                filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+                initialname=default_filename
+            )
+            
+            if filename:
+                with open(filename, 'w', encoding='utf-8') as f:
+                    json.dump(export_data, f, indent=2, ensure_ascii=False)
+                
+                messagebox.showinfo("Success", f"Results exported to:\n{filename}")
+                
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to export results:\n{str(e)}")
 
 def main():
     root = tk.Tk()

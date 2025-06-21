@@ -1,0 +1,22 @@
+{
+  "default_settings": {
+    "max_file_size_mb": 100,
+    "recursive_scan": true,
+    "show_clean_files": false,
+    "default_file_filter": "all"
+  },
+  "scan_limits": {
+    "max_file_size_mb": 1000,
+    "scan_timeout_seconds": 3600
+  },
+  "ui_settings": {
+    "window_width": 900,
+    "window_height": 700,
+    "results_height": 15
+  },
+  "export_settings": {
+    "default_format": "json",
+    "include_metadata": true,
+    "timestamp_format": "%Y%m%d_%H%M%S"
+  }
+}

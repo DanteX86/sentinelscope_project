@@ -42,12 +42,18 @@ A comprehensive security analysis and malware detection tool built with Python a
    cd sentinelscope_project
    ```
 
-2. **Install required dependencies**:
+2. **Set up virtual environment (recommended)**:
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install required dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Verify YARA installation**:
+4. **Verify installation**:
    ```bash
    python -c "import yara; print('YARA is ready!')"
    ```

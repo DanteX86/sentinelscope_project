@@ -231,8 +231,15 @@ class SentinelScopeApp:
     
     def cancel_scan(self):
         """Cancel the current scan"""
+        if not self.scanning:
+            return
+            
         self.scan_cancelled = True
-        self.progress_var.set("Cancelling scan...")
+        self.progress_var.set("⚠️ Cancelling scan - please wait...")
+        self.cancel_button.config(state="disabled", text="Cancelling...")
+        
+        # Force UI update immediately
+        self.root.update_idletasks()
     
     def perform_scan(self):
         """Perform the actual scanning process"""
@@ -240,9 +247,10 @@ class SentinelScopeApp:
             target_path = self.target_path_var.get()
             scan_type = self.scan_type.get()
             
-            self.results_text.delete(1.0, tk.END)
-            self.results_text.insert(tk.END, f"Starting {scan_type} scan: {target_path}\n")
-            self.results_text.insert(tk.END, "=" * 60 + "\n\n")
+            # Clear and setup results area
+            self.root.after(0, lambda: self.results_text.delete(1.0, tk.END))
+            self.root.after(0, lambda: self.results_text.insert(tk.END, f"Starting {scan_type} scan: {target_path}\n"))
+            self.root.after(0, lambda: self.results_text.insert(tk.END, "=" * 60 + "\n\n"))
             
             # Get max file size
             try:
@@ -251,77 +259,99 @@ class SentinelScopeApp:
             except ValueError:
                 max_size_bytes = 100 * 1024 * 1024  # Default 100MB
             
-            files_to_scan = []
+            # Get files to scan
+            self.root.after(0, lambda: self.progress_var.set("Building file list..."))
             
+            files_to_scan = []
             if scan_type == "file":
                 if os.path.isfile(target_path):
                     files_to_scan = [target_path]
             else:
                 # Directory or device scan
                 files_to_scan = self.get_files_to_scan(target_path, max_size_bytes)
+                if self.scan_cancelled:
+                    return
             
             total_files = len(files_to_scan)
             scanned_files = 0
             threats_found = 0
             
-            self.progress_var.set(f"Found {total_files} files to scan")
+            self.root.after(0, lambda: self.progress_var.set(f"Found {total_files} files to scan"))
             
             for file_path in files_to_scan:
+                # Check for cancellation frequently
                 if self.scan_cancelled:
                     break
                 
                 scanned_files += 1
-                self.progress_var.set(f"Scanning {scanned_files}/{total_files}: {os.path.basename(file_path)}")
+                
+                # Update progress more frequently
+                progress_text = f"Scanning {scanned_files}/{total_files}: {os.path.basename(file_path)}"
+                self.root.after(0, lambda text=progress_text: self.progress_var.set(text))
                 
                 try:
+                    # Check cancellation before scanning each file
+                    if self.scan_cancelled:
+                        break
+                        
                     matches = self.rules.match(file_path)
+                    
+                    # Check cancellation after scanning
+                    if self.scan_cancelled:
+                        break
                     
                     if matches:
                         threats_found += 1
-                        self.results_text.insert(tk.END, f"🚨 THREAT DETECTED: {file_path}\n")
+                        threat_text = f"🚨 THREAT DETECTED: {file_path}\n"
                         for match in matches:
-                            self.results_text.insert(tk.END, f"  Rule: {match.rule}")
+                            threat_text += f"  Rule: {match.rule}"
                             if match.meta and 'severity' in match.meta:
-                                self.results_text.insert(tk.END, f" (Severity: {match.meta['severity']})")
-                            self.results_text.insert(tk.END, "\n")
-                        self.results_text.insert(tk.END, "\n")
+                                threat_text += f" (Severity: {match.meta['severity']})"
+                            threat_text += "\n"
+                        threat_text += "\n"
+                        self.root.after(0, lambda text=threat_text: self.results_text.insert(tk.END, text))
                     elif self.show_clean_var.get():
-                        self.results_text.insert(tk.END, f"✅ Clean: {file_path}\n")
+                        clean_text = f"✅ Clean: {file_path}\n"
+                        self.root.after(0, lambda text=clean_text: self.results_text.insert(tk.END, text))
                         
                 except Exception as e:
-                    self.results_text.insert(tk.END, f"❌ Error scanning {file_path}: {str(e)}\n")
+                    error_text = f"❌ Error scanning {file_path}: {str(e)}\n"
+                    self.root.after(0, lambda text=error_text: self.results_text.insert(tk.END, text))
                 
-                # Update UI periodically
-                if scanned_files % 10 == 0:
-                    self.root.update_idletasks()
+                # Update UI frequently to keep it responsive
+                if scanned_files % 5 == 0:  # Update every 5 files instead of 10
+                    self.root.after(0, lambda: self.root.update_idletasks())
+                    time.sleep(0.01)  # Small delay to allow UI updates
             
-            # Scan complete
+            # Final results
             if self.scan_cancelled:
-                self.results_text.insert(tk.END, "\n" + "=" * 60 + "\n")
-                self.results_text.insert(tk.END, "⚠️ SCAN CANCELLED\n")
-                self.progress_var.set("Scan cancelled")
+                final_text = "\n" + "=" * 60 + "\n" + "⚠️ SCAN CANCELLED\n"
+                final_text += f"Files scanned before cancellation: {scanned_files}\n"
+                final_text += f"Threats found: {threats_found}\n"
+                self.root.after(0, lambda: self.results_text.insert(tk.END, final_text))
+                self.root.after(0, lambda: self.progress_var.set("Scan cancelled"))
             else:
-                self.results_text.insert(tk.END, "\n" + "=" * 60 + "\n")
-                self.results_text.insert(tk.END, f"📊 SCAN COMPLETE\n")
-                self.results_text.insert(tk.END, f"Files scanned: {scanned_files}\n")
-                self.results_text.insert(tk.END, f"Threats found: {threats_found}\n")
+                final_text = "\n" + "=" * 60 + "\n" + "📊 SCAN COMPLETE\n"
+                final_text += f"Files scanned: {scanned_files}\n"
+                final_text += f"Threats found: {threats_found}\n"
                 
                 if threats_found > 0:
-                    self.results_text.insert(tk.END, f"\n⚠️ WARNING: {threats_found} potential threats detected!\n")
+                    final_text += f"\n⚠️ WARNING: {threats_found} potential threats detected!\n"
                 else:
-                    self.results_text.insert(tk.END, f"\n✅ No threats detected. Target appears clean.\n")
+                    final_text += f"\n✅ No threats detected. Target appears clean.\n"
                 
-                self.progress_var.set(f"Scan complete: {scanned_files} files, {threats_found} threats")
+                self.root.after(0, lambda: self.results_text.insert(tk.END, final_text))
+                progress_text = f"Scan complete: {scanned_files} files, {threats_found} threats"
+                self.root.after(0, lambda: self.progress_var.set(progress_text))
             
         except Exception as e:
-            self.results_text.insert(tk.END, f"\n❌ Scan error: {str(e)}\n")
-            self.progress_var.set("Scan failed")
+            error_text = f"\n❌ Scan error: {str(e)}\n"
+            self.root.after(0, lambda: self.results_text.insert(tk.END, error_text))
+            self.root.after(0, lambda: self.progress_var.set("Scan failed"))
         
         finally:
-            self.scanning = False
-            self.scan_button.config(state="normal")
-            self.cancel_button.config(state="disabled")
-            self.progress_bar.stop()
+            # Reset UI state
+            self.root.after(0, self.reset_ui_state)
     
     def should_scan_file(self, file_path):
         """Check if file should be scanned based on file type filter"""
@@ -345,6 +375,8 @@ class SentinelScopeApp:
             elif os.path.isdir(target_path):
                 if recursive:
                     for root, dirs, files in os.walk(target_path):
+                        if self.scan_cancelled:
+                            break
                         for file in files:
                             if self.scan_cancelled:
                                 break
@@ -353,6 +385,10 @@ class SentinelScopeApp:
                                 if (os.path.getsize(file_path) <= max_size_bytes and 
                                     self.should_scan_file(file_path)):
                                     files_to_scan.append(file_path)
+                                    # Update progress periodically during file discovery
+                                    if len(files_to_scan) % 100 == 0:
+                                        progress_text = f"Found {len(files_to_scan)} files to scan..."
+                                        self.root.after(0, lambda text=progress_text: self.progress_var.set(text))
                             except (OSError, IOError):
                                 # Skip files we can't access
                                 continue
@@ -415,6 +451,14 @@ class SentinelScopeApp:
                 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to export results:\n{str(e)}")
+    
+    def reset_ui_state(self):
+        """Reset UI state after scan completion or cancellation"""
+        self.scanning = False
+        self.scan_cancelled = False
+        self.scan_button.config(state="normal")
+        self.cancel_button.config(state="disabled", text="Cancel Scan")
+        self.progress_bar.stop()
 
 def main():
     root = tk.Tk()

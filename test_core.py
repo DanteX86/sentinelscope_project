@@ -185,8 +185,9 @@ class TestApplicationFiles(unittest.TestCase):
             'class SentinelScopeApp',
             'def main(',
             'import yara',
-            'def scan_file',
-            'def load_yara_rules'
+            'def perform_scan',
+            'def load_yara_rules',
+            'from hash_analyzer import HashAnalyzer'
         ]
         
         for component in required_components:

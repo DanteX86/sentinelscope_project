@@ -11,6 +11,12 @@ A comprehensive security analysis and malware detection tool built with Python a
 - **Anti-Evasion Detection**: Detects anti-VM and sandbox evasion techniques
 
 ### Enhanced Detection Capabilities
+- **Hash Analysis Engine**: Instant malware detection via MD5/SHA1/SHA256 matching
+- **Dual-Layer Detection**: Combined hash analysis + YARA rule scanning
+- **Reputation Scoring**: 0-100 risk assessment with actionable recommendations
+- **Known Malware Database**: Expandable database of malware hashes
+- **Trusted File Whitelist**: Reputation-based file classification
+- **Performance Caching**: Optimized scanning with hash result caching
 - **Suspicious PE Headers**: Detects packed executables and suspicious binaries
 - **Network Activity Monitoring**: Identifies suspicious network communication patterns
 - **Cryptocurrency Mining Detection**: Finds hidden mining software
@@ -26,11 +32,15 @@ A comprehensive security analysis and malware detection tool built with Python a
 
 ## 📁 Project Structure
 
-- `sentinelscope_app.py` - Main GUI application
+- `sentinelscope_app.py` - Main GUI application with dual-layer detection
+- `hash_analyzer.py` - Hash analysis engine for known malware detection
+- `demo_hash_analysis.py` - Demonstration script for hash analysis capabilities
 - `rules.yar` - Comprehensive YARA rules for malware detection
+- `hash_cache/` - Hash databases (malware hashes, trusted files, cache)
 - `config.json` - Configuration settings for the application
 - `requirements.txt` - Python dependencies
 - `test_core.py` - Core functionality tests
+- `test_hash_analyzer.py` - Hash analysis module tests
 - `test_sentinelscope.py` - Application integration tests
 - `README.md` - This documentation
 
@@ -83,12 +93,59 @@ python sentinelscope_app.py
 - Includes scan metadata, settings, and timestamp
 - Structured data for further analysis or reporting
 
+## 🔍 Hash Analysis Engine
+
+### Demo the Hash Analysis Capabilities
+```bash
+# Run the hash analysis demonstration
+python demo_hash_analysis.py
+```
+
+### Hash Analysis Features
+- **Multi-Algorithm Support**: MD5, SHA1, SHA256 hash calculation
+- **Known Malware Database**: Instant detection of known threats
+- **Trusted File Whitelist**: Reputation-based classification
+- **Performance Caching**: Avoid re-scanning unchanged files
+- **Database Management**: Add/remove hashes dynamically
+- **Reputation Scoring**: 0-100 risk assessment system
+
+### Hash Database Management
+```python
+from hash_analyzer import HashAnalyzer
+
+# Initialize analyzer
+analyzer = HashAnalyzer()
+
+# Add malware hash
+analyzer.add_malware_hash(
+    hash_value="deadbeef12345678",
+    family="TestMalware",
+    severity="high",
+    description="Test malware sample"
+)
+
+# Add trusted hash
+analyzer.add_trusted_hash(
+    hash_value="cafebabe87654321",
+    vendor="Microsoft",
+    description="Trusted system file"
+)
+
+# Analyze file
+result = analyzer.analyze_file("/path/to/file")
+print(f"Threat Level: {result['threat_analysis']['threat_level']}")
+print(f"Reputation: {result['reputation']['score']}/100")
+```
+
 ## 🧪 Testing
 
 Run the comprehensive test suite:
 ```bash
 # Run core functionality tests
 python test_core.py
+
+# Run hash analyzer tests
+python test_hash_analyzer.py
 
 # Run application integration tests
 python test_sentinelscope.py

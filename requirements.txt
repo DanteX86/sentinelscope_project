@@ -1,1 +1,3 @@
 yara-python==4.5.1
+tkinter
+pillow>=11.2.0

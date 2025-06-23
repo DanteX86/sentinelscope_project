@@ -12,7 +12,7 @@ import threading
 import time
 import json
 import datetime
-import mimetypes
+from hash_analyzer import HashAnalyzer
 
 class SentinelScopeApp:
     def __init__(self, root):
@@ -23,6 +23,9 @@ class SentinelScopeApp:
         # Load YARA rules
         self.rules = None
         self.load_yara_rules()
+        
+        # Initialize hash analyzer
+        self.hash_analyzer = HashAnalyzer()
         
         # Scanning state
         self.scanning = False
@@ -247,10 +250,8 @@ class SentinelScopeApp:
             target_path = self.target_path_var.get()
             scan_type = self.scan_type.get()
             
-            # Clear and setup results area
-            self.root.after(0, lambda: self.results_text.delete(1.0, tk.END))
-            self.root.after(0, lambda: self.results_text.insert(tk.END, f"Starting {scan_type} scan: {target_path}\n"))
-            self.root.after(0, lambda: self.results_text.insert(tk.END, "=" * 60 + "\n\n"))
+            # Store results to update UI later
+            self.scan_results = []
             
             # Get max file size
             try:
@@ -258,9 +259,6 @@ class SentinelScopeApp:
                 max_size_bytes = max_size_mb * 1024 * 1024
             except ValueError:
                 max_size_bytes = 100 * 1024 * 1024  # Default 100MB
-            
-            # Get files to scan
-            self.root.after(0, lambda: self.progress_var.set("Building file list..."))
             
             files_to_scan = []
             if scan_type == "file":
@@ -276,82 +274,103 @@ class SentinelScopeApp:
             scanned_files = 0
             threats_found = 0
             
-            self.root.after(0, lambda: self.progress_var.set(f"Found {total_files} files to scan"))
+            # Add initial info to results
+            self.scan_results.append(f"Starting {scan_type} scan: {target_path}")
+            self.scan_results.append("=" * 60)
+            self.scan_results.append(f"Found {total_files} files to scan")
+            self.scan_results.append("")
             
             for file_path in files_to_scan:
-                # Check for cancellation frequently
+                # Quick cancellation check
                 if self.scan_cancelled:
                     break
                 
                 scanned_files += 1
                 
-                # Update progress more frequently
-                progress_text = f"Scanning {scanned_files}/{total_files}: {os.path.basename(file_path)}"
-                self.root.after(0, lambda text=progress_text: self.progress_var.set(text))
-                
                 try:
-                    # Check cancellation before scanning each file
+                    # Another quick cancellation check
                     if self.scan_cancelled:
                         break
+                    
+                    # Perform hash analysis first
+                    hash_analysis = self.hash_analyzer.analyze_file(file_path)
+                    
+                    # Check for hash-based threats
+                    hash_threat_detected = False
+                    if hash_analysis.get('status') == 'analyzed':
+                        threat_analysis = hash_analysis.get('threat_analysis', {})
+                        if threat_analysis.get('is_malware'):
+                            threats_found += 1
+                            hash_threat_detected = True
+                            self.scan_results.append(f"🚨 HASH THREAT DETECTED: {file_path}")
+                            self.scan_results.append(f"  Family: {threat_analysis.get('malware_family', 'Unknown')}")
+                            self.scan_results.append(f"  Threat Level: {threat_analysis.get('threat_level', 'unknown')}")
+                            self.scan_results.append(f"  Hash Type: {threat_analysis.get('matched_hash_type', 'unknown')}")
+                            self.scan_results.append(f"  MD5: {hash_analysis['hashes']['md5']}")
+                            self.scan_results.append(f"  SHA256: {hash_analysis['hashes']['sha256']}")
+                            self.scan_results.append("")
+                    
+                    # Perform YARA rule analysis if not already flagged by hash
+                    yara_threat_detected = False
+                    if not hash_threat_detected:
+                        matches = self.rules.match(file_path)
                         
-                    matches = self.rules.match(file_path)
+                        if matches:
+                            threats_found += 1
+                            yara_threat_detected = True
+                            self.scan_results.append(f"🚨 YARA THREAT DETECTED: {file_path}")
+                            for match in matches:
+                                severity = match.meta.get('severity', 'unknown') if match.meta else 'unknown'
+                                self.scan_results.append(f"  Rule: {match.rule} (Severity: {severity})")
+                            # Add hash info for YARA detections too
+                            if hash_analysis.get('status') == 'analyzed':
+                                self.scan_results.append(f"  File Hashes:")
+                                self.scan_results.append(f"    MD5: {hash_analysis['hashes']['md5']}")
+                                self.scan_results.append(f"    SHA256: {hash_analysis['hashes']['sha256']}")
+                            self.scan_results.append("")
                     
-                    # Check cancellation after scanning
-                    if self.scan_cancelled:
-                        break
-                    
-                    if matches:
-                        threats_found += 1
-                        threat_text = f"🚨 THREAT DETECTED: {file_path}\n"
-                        for match in matches:
-                            threat_text += f"  Rule: {match.rule}"
-                            if match.meta and 'severity' in match.meta:
-                                threat_text += f" (Severity: {match.meta['severity']})"
-                            threat_text += "\n"
-                        threat_text += "\n"
-                        self.root.after(0, lambda text=threat_text: self.results_text.insert(tk.END, text))
-                    elif self.show_clean_var.get():
-                        clean_text = f"✅ Clean: {file_path}\n"
-                        self.root.after(0, lambda text=clean_text: self.results_text.insert(tk.END, text))
+                    # Show clean files if requested
+                    if not hash_threat_detected and not yara_threat_detected and self.show_clean_var.get():
+                        clean_status = "✅ Clean"
+                        if hash_analysis.get('status') == 'analyzed':
+                            threat_analysis = hash_analysis.get('threat_analysis', {})
+                            if threat_analysis.get('is_trusted'):
+                                clean_status += " (Trusted)"
+                        self.scan_results.append(f"{clean_status}: {file_path}")
                         
                 except Exception as e:
-                    error_text = f"❌ Error scanning {file_path}: {str(e)}\n"
-                    self.root.after(0, lambda text=error_text: self.results_text.insert(tk.END, text))
+                    self.scan_results.append(f"❌ Error scanning {file_path}: {str(e)}")
                 
-                # Update UI frequently to keep it responsive
-                if scanned_files % 5 == 0:  # Update every 5 files instead of 10
-                    self.root.after(0, lambda: self.root.update_idletasks())
-                    time.sleep(0.01)  # Small delay to allow UI updates
+                # Update progress periodically without blocking
+                if scanned_files % 10 == 0:
+                    # Just a simple sleep to prevent tight loop
+                    time.sleep(0.001)
             
             # Final results
+            self.scan_results.append("")
+            self.scan_results.append("=" * 60)
+            
             if self.scan_cancelled:
-                final_text = "\n" + "=" * 60 + "\n" + "⚠️ SCAN CANCELLED\n"
-                final_text += f"Files scanned before cancellation: {scanned_files}\n"
-                final_text += f"Threats found: {threats_found}\n"
-                self.root.after(0, lambda: self.results_text.insert(tk.END, final_text))
-                self.root.after(0, lambda: self.progress_var.set("Scan cancelled"))
+                self.scan_results.append("⚠️ SCAN CANCELLED")
+                self.scan_results.append(f"Files scanned before cancellation: {scanned_files}")
             else:
-                final_text = "\n" + "=" * 60 + "\n" + "📊 SCAN COMPLETE\n"
-                final_text += f"Files scanned: {scanned_files}\n"
-                final_text += f"Threats found: {threats_found}\n"
-                
+                self.scan_results.append("📊 SCAN COMPLETE")
+                self.scan_results.append(f"Files scanned: {scanned_files}")
+            
+            self.scan_results.append(f"Threats found: {threats_found}")
+            
+            if not self.scan_cancelled:
                 if threats_found > 0:
-                    final_text += f"\n⚠️ WARNING: {threats_found} potential threats detected!\n"
+                    self.scan_results.append(f"\n⚠️ WARNING: {threats_found} potential threats detected!")
                 else:
-                    final_text += f"\n✅ No threats detected. Target appears clean.\n"
-                
-                self.root.after(0, lambda: self.results_text.insert(tk.END, final_text))
-                progress_text = f"Scan complete: {scanned_files} files, {threats_found} threats"
-                self.root.after(0, lambda: self.progress_var.set(progress_text))
+                    self.scan_results.append(f"\n✅ No threats detected. Target appears clean.")
             
         except Exception as e:
-            error_text = f"\n❌ Scan error: {str(e)}\n"
-            self.root.after(0, lambda: self.results_text.insert(tk.END, error_text))
-            self.root.after(0, lambda: self.progress_var.set("Scan failed"))
+            self.scan_results.append(f"\n❌ Scan error: {str(e)}")
         
         finally:
-            # Reset UI state
-            self.root.after(0, self.reset_ui_state)
+            # Schedule UI update
+            self.root.after_idle(self.update_ui_after_scan)
     
     def should_scan_file(self, file_path):
         """Check if file should be scanned based on file type filter"""
@@ -385,10 +404,6 @@ class SentinelScopeApp:
                                 if (os.path.getsize(file_path) <= max_size_bytes and 
                                     self.should_scan_file(file_path)):
                                     files_to_scan.append(file_path)
-                                    # Update progress periodically during file discovery
-                                    if len(files_to_scan) % 100 == 0:
-                                        progress_text = f"Found {len(files_to_scan)} files to scan..."
-                                        self.root.after(0, lambda text=progress_text: self.progress_var.set(text))
                             except (OSError, IOError):
                                 # Skip files we can't access
                                 continue
@@ -413,24 +428,13 @@ class SentinelScopeApp:
     
     def export_results(self):
         """Export scan results to JSON file"""
-        if not hasattr(self, 'results_text') or not self.results_text.get(1.0, tk.END).strip():
-            messagebox.showwarning("Warning", "No scan results to export!")
-            return
-        
         try:
-            # Get results text
-            results_content = self.results_text.get(1.0, tk.END)
+            # Check if there are any results to export
+            results_content = self.results_text.get(1.0, tk.END).strip()
             
-            # Create export data
-            export_data = {
-                'timestamp': datetime.datetime.now().isoformat(),
-                'scan_target': self.target_path_var.get(),
-                'scan_type': self.scan_type.get(),
-                'file_filter': self.file_filter_var.get(),
-                'recursive_scan': self.recursive_var.get(),
-                'max_file_size_mb': self.max_size_var.get(),
-                'raw_results': results_content
-            }
+            if not results_content or results_content == "":
+                messagebox.showwarning("Warning", "No scan results to export!\nPlease run a scan first.")
+                return
             
             # Ask user for save location
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -439,18 +443,77 @@ class SentinelScopeApp:
             filename = filedialog.asksaveasfilename(
                 title="Export Scan Results",
                 defaultextension=".json",
-                filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
-                initialname=default_filename
+                filetypes=[("JSON files", "*.json"), ("Text files", "*.txt"), ("All files", "*.*")],
+                initialfile=default_filename
             )
             
-            if filename:
+            if not filename:  # User cancelled
+                return
+            
+            # Create export data
+            export_data = {
+                'application': 'SentinelScope',
+                'version': '1.0',
+                'timestamp': datetime.datetime.now().isoformat(),
+                'scan_configuration': {
+                    'target_path': self.target_path_var.get(),
+                    'scan_type': self.scan_type.get(),
+                    'file_filter': self.file_filter_var.get(),
+                    'recursive_scan': self.recursive_var.get(),
+                    'max_file_size_mb': self.max_size_var.get(),
+                    'show_clean_files': self.show_clean_var.get()
+                },
+                'results': {
+                    'raw_output': results_content,
+                    'results_lines': results_content.split('\n')
+                }
+            }
+            
+            # Determine file type from extension
+            file_ext = os.path.splitext(filename)[1].lower()
+            
+            if file_ext == '.json':
+                # Save as JSON
                 with open(filename, 'w', encoding='utf-8') as f:
                     json.dump(export_data, f, indent=2, ensure_ascii=False)
+            else:
+                # Save as plain text (fallback)
+                with open(filename, 'w', encoding='utf-8') as f:
+                    f.write(f"SentinelScope Scan Results\n")
+                    f.write(f"Generated: {export_data['timestamp']}\n")
+                    f.write(f"Target: {export_data['scan_configuration']['target_path']}\n")
+                    f.write(f"Scan Type: {export_data['scan_configuration']['scan_type']}\n")
+                    f.write("\n" + "=" * 60 + "\n\n")
+                    f.write(results_content)
+            
+            messagebox.showinfo("Export Successful", 
+                               f"Scan results exported successfully to:\n\n{filename}\n\n"
+                               f"File size: {os.path.getsize(filename)} bytes")
                 
-                messagebox.showinfo("Success", f"Results exported to:\n{filename}")
-                
+        except PermissionError:
+            messagebox.showerror("Permission Error", 
+                                "Cannot write to the selected location.\n"
+                                "Please choose a different location or check file permissions.")
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to export results:\n{str(e)}")
+            messagebox.showerror("Export Error", 
+                                f"Failed to export results:\n\n{str(e)}\n\n"
+                                f"Please try again or choose a different location.")
+    
+    def update_ui_after_scan(self):
+        """Update UI with scan results after scan completion"""
+        # Clear and populate results
+        self.results_text.delete(1.0, tk.END)
+        for line in self.scan_results:
+            self.results_text.insert(tk.END, line + "\n")
+        
+        # Update progress
+        if self.scan_cancelled:
+            self.progress_var.set("Scan cancelled")
+        else:
+            self.progress_var.set("Scan complete")
+        
+        # Reset UI state
+        self.reset_ui_state()
     
     def reset_ui_state(self):
         """Reset UI state after scan completion or cancellation"""

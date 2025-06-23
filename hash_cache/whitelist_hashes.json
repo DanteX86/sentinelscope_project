@@ -1,0 +1,13 @@
+{
+  "d41d8cd98f00b204e9800998ecf8427e": {
+    "vendor": "System",
+    "description": "Empty file",
+    "verified": true
+  },
+  "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe": {
+    "vendor": "Demo Vendor",
+    "description": "Demo trusted file hash",
+    "verified": true,
+    "added": "2025-06-21"
+  }
+}

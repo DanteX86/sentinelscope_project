@@ -1,0 +1,122 @@
+{
+  "/var/folders/1_/z8sq_fgs787g67kgsyhj9ytm0000gn/T/tmp2izqi139:1750553739.7020888": {
+    "status": "analyzed",
+    "filepath": "/var/folders/1_/z8sq_fgs787g67kgsyhj9ytm0000gn/T/tmp2izqi139",
+    "file_size": 68,
+    "hashes": {
+      "md5": "44d88612fea8a8f36de82e1278abb02f",
+      "sha1": "3395856ce81f2b7382dee72602f798b642f14140",
+      "sha256": "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f"
+    },
+    "calculation_time": 0.0,
+    "threat_analysis": {
+      "is_malware": true,
+      "is_trusted": false,
+      "malware_family": "EICAR Test File",
+      "threat_level": "test",
+      "matched_hash_type": "md5",
+      "confidence": 1.0,
+      "first_seen": "1991-01-01",
+      "description": "EICAR anti-virus test file"
+    },
+    "reputation": {
+      "score": 0,
+      "classification": "malicious",
+      "recommendations": [
+        "Quarantine this file immediately",
+        "Run full system scan",
+        "Check for system compromise indicators"
+      ]
+    },
+    "timestamp": 1750553739.702155
+  },
+  "/var/folders/1_/z8sq_fgs787g67kgsyhj9ytm0000gn/T/tmpk9nkmxui.txt:1750553875.7670708": {
+    "status": "analyzed",
+    "filepath": "/var/folders/1_/z8sq_fgs787g67kgsyhj9ytm0000gn/T/tmpk9nkmxui.txt",
+    "file_size": 68,
+    "hashes": {
+      "md5": "44d88612fea8a8f36de82e1278abb02f",
+      "sha1": "3395856ce81f2b7382dee72602f798b642f14140",
+      "sha256": "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f"
+    },
+    "calculation_time": 0.0,
+    "threat_analysis": {
+      "is_malware": true,
+      "is_trusted": false,
+      "malware_family": "EICAR Test File",
+      "threat_level": "test",
+      "matched_hash_type": "md5",
+      "confidence": 1.0,
+      "first_seen": "1991-01-01",
+      "description": "EICAR anti-virus test file"
+    },
+    "reputation": {
+      "score": 0,
+      "classification": "malicious",
+      "recommendations": [
+        "Quarantine this file immediately",
+        "Run full system scan",
+        "Check for system compromise indicators"
+      ]
+    },
+    "timestamp": 1750553875.767425
+  },
+  "/var/folders/1_/z8sq_fgs787g67kgsyhj9ytm0000gn/T/tmp7vcteh7g.txt:1750553875.7671633": {
+    "status": "analyzed",
+    "filepath": "/var/folders/1_/z8sq_fgs787g67kgsyhj9ytm0000gn/T/tmp7vcteh7g.txt",
+    "file_size": 50,
+    "hashes": {
+      "md5": "1776f89b6e875b1cf412311b5d5db74e",
+      "sha1": "e4b3253fb93046b7ebd2fc30fc0435caff84f3cd",
+      "sha256": "5e7e5145d97e33908596442df47b0f49354da5a86e43154e6151da900bce0cb7"
+    },
+    "calculation_time": 0.0,
+    "threat_analysis": {
+      "is_malware": false,
+      "is_trusted": false,
+      "malware_family": null,
+      "threat_level": "unknown",
+      "matched_hash_type": null,
+      "confidence": 0.0
+    },
+    "reputation": {
+      "score": 50,
+      "classification": "unknown",
+      "recommendations": [
+        "File is unknown - proceed with caution",
+        "Consider additional analysis methods",
+        "Monitor file behavior if executed"
+      ]
+    },
+    "timestamp": 1750553875.767637
+  },
+  "/var/folders/1_/z8sq_fgs787g67kgsyhj9ytm0000gn/T/tmpdufq6mvn.js:1750553875.767349": {
+    "status": "analyzed",
+    "filepath": "/var/folders/1_/z8sq_fgs787g67kgsyhj9ytm0000gn/T/tmpdufq6mvn.js",
+    "file_size": 178,
+    "hashes": {
+      "md5": "49574b84a75f173ee224988ab59428a4",
+      "sha1": "462321cff31316c0a99686f440de983b34695d4c",
+      "sha256": "320c7f648f1dfaa062e394d39f71c9afcf3eaf3d0d7eb6fa34a80c4aa580a9b1"
+    },
+    "calculation_time": 0.0,
+    "threat_analysis": {
+      "is_malware": false,
+      "is_trusted": false,
+      "malware_family": null,
+      "threat_level": "unknown",
+      "matched_hash_type": null,
+      "confidence": 0.0
+    },
+    "reputation": {
+      "score": 50,
+      "classification": "unknown",
+      "recommendations": [
+        "File is unknown - proceed with caution",
+        "Consider additional analysis methods",
+        "Monitor file behavior if executed"
+      ]
+    },
+    "timestamp": 1750553875.767835
+  }
+}
